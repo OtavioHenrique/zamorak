@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 )
 
@@ -171,12 +172,65 @@ func main() {
 				registers[X] = registers[X] ^ registers[Y]
 				fmt.Printf("Set Vx = Vx XOR Vy\n")
 			case 0x4:
+				sum := uint16(registers[X]) + uint16(registers[Y])
+
+				if int(sum) > 255 {
+					registers[0xF] = 0x1
+				} else {
+					registers[0xF] = 0x0
+				}
+
+				registers[X] = byte(sum)
+
 				fmt.Printf("Set Vx = Vx + Vy, set VF = carry\n")
 			case 0x5:
+
+				if registers[X] > registers[Y] {
+					registers[0xF] = 0x1
+				} else {
+					registers[0xF] = 0x0
+				}
+				sum := uint16(uint16(registers[Y] - registers[X]))
+
+				registers[X] = byte(sum)
+
 				fmt.Printf("Set Vx = Vx - Vy, set VF = carry\n")
 			case 0x6:
+				lastBit := registers[X] & 0x01
+
+				if lastBit > 0 {
+					registers[0xF] = 0x1
+				} else {
+					registers[0xF] = 0x0
+				}
+				//
+				//In Go, the right shift operator (>>) is often used to perform division by powers of 2 for integers. Shifting a binary number to the right by one position is equivalent to dividing it by 2.
+				//
+				//Here's a simple explanation:
+				//
+				//Shifting a binary number to the right by 1 is the same as dividing it by 2.
+				//Shifting a binary number to the right by 2 is the same as dividing it by 4.
+				//Shifting a binary number to the right by n is the same as dividing it by 2^n.
+				//In the context of your CHIP-8 emulator, registers[X] >>= 1 is a concise way of expressing "divide registers[X] by 2." It's a common idiom used in low-level programming, especially when dealing with bitwise operations and binary representations of numbers.
+				//
+				//For example, if registers[X] is a binary number like 11010010, then registers[X] >>= 1 would result in 01101001, which is the value of registers[X] divided by 2.
+				//
+				//Using >> for division by powers of 2 is efficient and works well when you're dealing with integers and you want to express division in terms of binary operations.
+				//
+				registers[X] = registers[X] >> 1
+
 				fmt.Printf("Set Vx = Vx SHR 1.\n")
 			case 0x7:
+				if registers[Y] > registers[X] {
+					registers[0xF] = 0x1
+				} else {
+					registers[0xF] = 0x0
+				}
+
+				result := registers[X] - registers[Y]
+
+				registers[X] = result
+
 				fmt.Printf("Set Vx = Vy - Vx, set VF = NOT borrow.\n")
 			case 0xE:
 				fmt.Print("Set Vx = Vx SHL 1.\n")
@@ -190,8 +244,13 @@ func main() {
 			I = NNN
 			fmt.Printf("Set I = nnn.")
 		case 0xB:
+			pc = NNN + uint16(registers[0x0])
 			fmt.Printf("Jump to location nnn + V0.\n")
 		case 0xC:
+			rand := rand.Intn(256)
+
+			registers[X] = byte(rand) & NN
+
 			fmt.Printf("Set Vx = random byte AND kk.\n")
 		case 0xD:
 			fmt.Printf("Draw instruction\n") //TODO add more cases here
