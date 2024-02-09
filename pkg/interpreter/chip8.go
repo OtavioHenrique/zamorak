@@ -59,6 +59,8 @@ type Chip8 struct {
 	registers     [16]byte   // represents the 16 1-byte registers
 	pc            uint16     // Program counter, set it to the initial memory offset
 	memory        [4096]byte //4kb internal memory
+	delayTimer    byte
+	soundTimer    byte
 }
 
 func NewChip8() *Chip8 {
@@ -70,6 +72,8 @@ func NewChip8() *Chip8 {
 	c.registers = [16]byte{}
 	c.pc = uint16(MEMORY_OFFSET)
 	c.memory = [4096]byte{}
+	c.delayTimer = 0x0
+	c.soundTimer = 0x0
 
 	return c
 }
@@ -97,7 +101,6 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 
 		// DECODE
 
-		var I uint16              // represents Index register
 		instr := (b0 & 0xF0) >> 4 // first nibble, the instruction
 		X := b0 & 0x0F            // second nibble, register lookup!
 
@@ -127,7 +130,7 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 				fmt.Printf("Unknown instruction. INSTR: %02x Y: %02x\n", instr, Y)
 			}
 		case 0x1:
-			pc = NNN
+			c.pc = NNN
 			fmt.Printf("JUMP to NNN: %02x\n", NNN)
 			fmt.Printf("SET PROGRAM COUNTER to NNN: %02x\n", NNN)
 		case 0x2:
@@ -314,6 +317,50 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 			}
 		case 0xF:
 			fmt.Printf("Timer instruction.\n")
+
+			switch NN {
+			case 0x07:
+				fmt.Printf("Set Vx = delayTimer\n")
+
+				c.registers[X] = c.delayTimer
+			case 0x0A:
+			case 0x15:
+				fmt.Printf("Set delayTimer = Vx\n")
+
+				c.delayTimer = c.registers[X]
+			case 0x18:
+				fmt.Printf("Set soundTimer = Vx\n")
+
+				c.soundTimer = c.registers[X]
+			case 0x1E:
+				fmt.Printf("Set I = I + Vx\n")
+
+				c.indexRegister = c.indexRegister + uint16(c.registers[X])
+			case 0x29:
+				fmt.Printf("Set I = location of sprite for digit Vx.\n")
+
+				b := c.registers[X] & 0x0F
+
+				c.indexRegister = uint16(FONT_SET[b])
+			case 0x33:
+				fmt.Printf("Store BCD representation of Vx in memory locations I, I+1, and I+2.\n")
+
+				//The interpreter takes the decimal value of Vx,
+				//and places the hundreds digit in memory at location in I,
+				//the tens digit at location I+1, and the ones digit at location I+2.
+
+				c.memory[c.indexRegister+0] = (c.registers[X] / 100) % 10
+				c.memory[c.indexRegister+1] = (c.registers[X] / 10) % 10
+				c.memory[c.indexRegister+2] = (c.registers[X] / 1) % 10
+			case 0x55:
+				fmt.Printf("Store registers V0 through Vx in memory starting at location I.\n")
+
+				for i := 0; i <= int(X); i++ {
+					index := c.indexRegister + uint16(i)
+					c.memory[index] = c.registers[i]
+				}
+				c.indexRegister = c.indexRegister + uint16(X+1)
+			}
 		default:
 			fmt.Printf("Unknown Instruction.\n")
 		}
