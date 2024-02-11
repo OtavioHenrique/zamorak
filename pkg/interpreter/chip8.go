@@ -134,13 +134,18 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 		case 0x00:
 			switch Y {
 			case 0x0E:
-				fmt.Print("clear scren\n")
-			case 0xEE:
-				c.pc = c.stack[c.stackFrame]
-				c.stackFrame--
-				fmt.Print("set stack pointer to the top\n")
-			default:
-				fmt.Printf("Unknown instruction. INSTR: %02x Y: %02x\n", instr, Y)
+				switch N {
+				case 0x0: // clear screen
+					r.ClearScreen()
+
+					fmt.Print("clear scren\n")
+				case 0xE:
+					c.pc = c.stack[c.stackFrame]
+					c.stackFrame--
+					fmt.Print("set stack pointer to the top\n")
+				default:
+					fmt.Printf("Unknown instruction. INSTR: %02x Y: %02x\n", instr, Y)
+				}
 			}
 		case 0x1:
 			c.pc = NNN
@@ -166,10 +171,10 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 			}
 			fmt.Printf("Skip next instruction if Vx != kk.\n")
 		case 0x5:
-			if c.registers[X] == c.registers[Y] {
+			fmt.Printf("Skip next instruction if Vx = Vy.\n")
+			if N == 0x0 && c.registers[X] == c.registers[Y] {
 				c.pc += 2
 			}
-			fmt.Printf("Skip next instruction if Vx = Vy.\n")
 		case 0x6:
 			c.registers[X] = NN
 
@@ -192,6 +197,8 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 				c.registers[X] = c.registers[X] ^ c.registers[Y]
 				fmt.Printf("Set Vx = Vx XOR Vy\n")
 			case 0x4:
+				fmt.Printf("Set Vx = Vx + Vy, set VF = carry\n")
+
 				sum := uint16(c.registers[X]) + uint16(c.registers[Y])
 
 				if int(sum) > 255 {
@@ -201,20 +208,15 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 				}
 
 				c.registers[X] = byte(sum)
-
-				fmt.Printf("Set Vx = Vx + Vy, set VF = carry\n")
 			case 0x5:
+				fmt.Printf("Set Vx = Vx - Vy, set VF = carry\n")
 
 				if c.registers[X] > c.registers[Y] {
 					c.registers[0xF] = 0x1
 				} else {
 					c.registers[0xF] = 0x0
 				}
-				count := uint16(uint16(c.registers[Y] - c.registers[X]))
-
-				c.registers[X] = byte(count)
-
-				fmt.Printf("Set Vx = Vx - Vy, set VF = carry\n")
+				c.registers[X] = c.registers[X] - c.registers[Y]
 			case 0x6:
 				lastBit := c.registers[X] & 0x01
 
@@ -253,6 +255,16 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 
 				fmt.Printf("Set Vx = Vy - Vx, set VF = NOT borrow.\n")
 			case 0xE:
+				c.registers[X] = c.registers[Y]
+				// check if leftmost bit is set (and shifted out)
+				//fmt.Printf("%s: Shift left. Was: %08b", instruction, e.registers[Y])
+				if c.registers[X]&(1<<7) > 0 {
+					//fmt.Printf(" 0xF bit was set!\n")
+					c.registers[0xF] = 0x1
+				} else {
+					c.registers[0xF] = 0x0
+				}
+				c.registers[X] = c.registers[X] << 1
 				fmt.Print("Set Vx = Vx SHL 1.\n")
 			}
 		case 0x9:
@@ -379,6 +391,12 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 					c.memory[index] = c.registers[i]
 				}
 				c.indexRegister = c.indexRegister + uint16(X+1)
+			case 0x65:
+				fmt.Printf("Read registers V0 through Vx from memory starting at location I.")
+				for i := uint8(0); i <= X; i++ {
+					c.registers[i] = c.memory[c.indexRegister]
+					c.indexRegister = c.indexRegister + 1
+				}
 			}
 		default:
 			fmt.Printf("Unknown Instruction.\n")
