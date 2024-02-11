@@ -71,6 +71,53 @@ func (r *Runtime) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHe
 	return r.width, r.height
 }
 
+func (g *Runtime) WaitKeyPress(c chan byte) {
+	for _, key := range g.keys {
+		out := keyToByte(key)
+		c <- out
+	}
+}
+
+func keyToByte(key ebiten.Key) byte {
+	var out byte
+	switch key {
+	case ebiten.KeyDigit1:
+		out = 0x0
+	case ebiten.KeyDigit2:
+		out = 0x1
+	case ebiten.KeyDigit3:
+		out = 0x2
+	case ebiten.KeyDigit4:
+		out = 0x3
+	case ebiten.KeyQ:
+		out = 0x4
+	case ebiten.KeyW:
+		out = 0x5
+	case ebiten.KeyE:
+		out = 0x6
+	case ebiten.KeyR:
+		out = 0x7
+	case ebiten.KeyA:
+		out = 0x8
+	case ebiten.KeyS:
+		out = 0x9
+	case ebiten.KeyD:
+		out = 0xA
+	case ebiten.KeyF:
+		out = 0xB
+	case ebiten.KeyZ:
+		out = 0xC
+	case ebiten.KeyX:
+		out = 0xD
+	case ebiten.KeyC:
+		out = 0xE
+	case ebiten.KeyV:
+		out = 0xF
+	}
+
+	return out
+}
+
 func ByteToKey(b byte) ebiten.Key {
 	var out ebiten.Key
 	switch b {
@@ -107,5 +154,6 @@ func ByteToKey(b byte) ebiten.Key {
 	case 0xF:
 		return ebiten.KeyV
 	}
+
 	return out
 }

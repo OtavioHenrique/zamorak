@@ -248,7 +248,7 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 			}
 			fmt.Printf("Skip next instruction if Vx != Vy.\n")
 		case 0xA:
-			I = NNN
+			c.indexRegister = NNN
 			fmt.Printf("Set I = nnn.")
 		case 0xB:
 			c.pc = NNN + uint16(c.registers[0x0])
@@ -324,6 +324,12 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 
 				c.registers[X] = c.delayTimer
 			case 0x0A:
+				ch := make(chan byte)
+				go r.WaitKeyPress(ch)
+
+				key := <-ch
+
+				c.registers[X] = key
 			case 0x15:
 				fmt.Printf("Set delayTimer = Vx\n")
 
@@ -345,7 +351,7 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 			case 0x33:
 				fmt.Printf("Store BCD representation of Vx in memory locations I, I+1, and I+2.\n")
 
-				//The interpreter takes the decimal value of Vx,
+				//The interpreter takes the decimal value of Vx,``
 				//and places the hundreds digit in memory at location in I,
 				//the tens digit at location I+1, and the ones digit at location I+2.
 
