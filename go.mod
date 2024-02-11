@@ -4,7 +4,12 @@ go 1.21.4
 
 require github.com/hajimehoshi/ebiten/v2 v2.6.5
 
-require github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200707082815-5321531c36a2 // indirect
+require (
+	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200707082815-5321531c36a2 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/spf13/cobra v1.8.0 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
+)
 
 require (
 	github.com/ebitengine/purego v0.5.0 // indirect

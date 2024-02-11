@@ -21,10 +21,16 @@ type Runtime struct {
 }
 
 func NewRuntime(width, height int) *Runtime {
+	initializedImage := ebiten.NewImage(64, 32)
+	initializedImage.Fill(color.RGBA{}) // initialize all pixels to black, 0 alpha.
+
 	r := new(Runtime)
 
 	r.width = width
 	r.height = height
+	r.image = image.NewRGBA(image.Rect(0, 0, 64, 32))
+
+	r.ClearScreen()
 
 	return r
 }

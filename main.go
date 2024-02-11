@@ -1,22 +1,11 @@
+/*
+Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+
+*/
 package main
 
-import (
-	"log"
-
-	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/otaviohenrique/zamorak/pkg/engine"
-)
+import "github.com/otaviohenrique/zamorak/cmd"
 
 func main() {
-	// programData, err := os.ReadFile("IBMLogo.ch8")
-	// if err != nil {
-	// 	fmt.Print(err)
-	// }
-
-	ebiten.SetWindowSize(640, 480)
-	ebiten.SetWindowTitle("Hello, World!")
-
-	if err := ebiten.RunGame(engine.NewRuntime(64, 32)); err != nil {
-		log.Fatal(err)
-	}
+	cmd.Execute()
 }
