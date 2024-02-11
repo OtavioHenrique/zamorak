@@ -78,7 +78,20 @@ func NewChip8() *Chip8 {
 	return c
 }
 
+func (c *Chip8) startDelayTimer() {
+	var tick = 1000 / 60
+
+	for {
+		time.Sleep(time.Millisecond * time.Duration(tick))
+
+		if c.delayTimer > 0 {
+			c.delayTimer--
+		}
+	}
+}
+
 func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
+	go c.startDelayTimer()
 	// Verifies if program size is greater than chip memory
 	if len(programData) > CHIP_MEMORY {
 		fmt.Print("Given program is larger than memory")
@@ -92,7 +105,7 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 		c.memory[MEMORY_OFFSET+i] = programData[i]
 	}
 
-	for i := 0; i < len(programData); i++ {
+	for {
 		// SET program counter to the first byte of the software
 
 		b0 := c.memory[c.pc]
@@ -139,8 +152,8 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 			c.pc = NNN
 			fmt.Printf("CALL subroutine at NNN: %02x\n", NNN)
 			fmt.Printf("Increment stack pointer\n")
-			fmt.Printf("Put PC at top of the stack. PC: %d\n", pc)
-			fmt.Printf("SET PC to NNN. PC: %d, NNN: %02x\n", pc, NNN)
+			fmt.Printf("Put PC at top of the stack. PC: %d\n", c.pc)
+			fmt.Printf("SET PC to NNN. PC: %d, NNN: %02x\n", c.pc, NNN)
 		case 0x3:
 			if c.registers[X] == NN {
 				c.pc += 2
@@ -268,7 +281,7 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 			numLines := int(N)
 			firstByteIndex := c.indexRegister
 
-			for line := 0; i < numLines; line++ {
+			for line := 0; line < numLines; line++ {
 				// first byte index
 				sprite := c.memory[firstByteIndex]
 
