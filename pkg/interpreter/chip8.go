@@ -282,6 +282,8 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 				//
 				c.registers[X] = c.registers[X] >> 1
 			case 0x7:
+				c.logger.Debug("Set Vx = Vy - Vx, set VF = NOT borrow", "VX", fmt.Sprintf("%02x", c.registers[X]), "VY", fmt.Sprintf("%02x", c.registers[Y]), "VF", fmt.Sprintf("%02x", c.registers[0xF]), "INSTR", fmt.Sprintf("%02x", instr))
+
 				if c.registers[Y] > c.registers[X] {
 					c.registers[0xF] = 0x1
 				} else {
@@ -291,38 +293,39 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 				result := c.registers[X] - c.registers[Y]
 
 				c.registers[X] = result
-
-				fmt.Printf("Set Vx = Vy - Vx, set VF = NOT borrow.\n")
 			case 0xE:
+				c.logger.Debug("Set Vx = Vx SHL 1", "VX", fmt.Sprintf("%02x", c.registers[X]), "INSTR", fmt.Sprintf("%02x", instr))
+
 				c.registers[X] = c.registers[Y]
+
 				// check if leftmost bit is set (and shifted out)
-				//fmt.Printf("%s: Shift left. Was: %08b", instruction, e.registers[Y])
 				if c.registers[X]&(1<<7) > 0 {
-					//fmt.Printf(" 0xF bit was set!\n")
 					c.registers[0xF] = 0x1
 				} else {
 					c.registers[0xF] = 0x0
 				}
 				c.registers[X] = c.registers[X] << 1
-				fmt.Print("Set Vx = Vx SHL 1.\n")
 			}
 		case 0x9:
+			c.logger.Debug("Skip next instruction if Vx != Vy", "VX", fmt.Sprintf("%02x", c.registers[X]), "VY", fmt.Sprintf("%02x", c.registers[Y]), "INSTR", fmt.Sprintf("%02x", instr))
+
 			if c.registers[X] != c.registers[Y] {
 				c.pc += 2 // SKIP INSTRUCTION (wrap on function)
 			}
-			fmt.Printf("Skip next instruction if Vx != Vy.\n")
 		case 0xA:
+			c.logger.Debug("Set I = nnn", "I", fmt.Sprintf("%02x", c.indexRegister), "NNN", fmt.Sprintf("%02x", NNN), "INSTR", fmt.Sprintf("%02x", instr))
+
 			c.indexRegister = NNN
-			fmt.Printf("Set I = nnn.")
 		case 0xB:
+			c.logger.Debug("Jump to location nnn + V0", "V0", fmt.Sprintf("%02x", c.registers[0x0]), "NNN", fmt.Sprintf("%02x", NNN), "INSTR", fmt.Sprintf("%02x", instr))
+
 			c.pc = NNN + uint16(c.registers[0x0])
-			fmt.Printf("Jump to location nnn + V0.\n")
 		case 0xC:
 			rand := rand.Intn(256)
 
 			c.registers[X] = byte(rand) & NN
 
-			fmt.Printf("Set Vx = random byte AND kk.\n")
+			c.logger.Debug("Set Vx = random byte AND kk", "RANDOM BYTE", fmt.Sprintf("%02x", rand), "VX", fmt.Sprintf("%02x", c.registers[X]), "KK (NN)", fmt.Sprintf("%02x", NN), "INSTR", fmt.Sprintf("%02x", instr))
 		case 0xD:
 			xc := c.registers[X] % 64
 			yc := c.registers[Y] % 32
