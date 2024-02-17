@@ -1,10 +1,14 @@
 package engine
 
 import (
+	"bytes"
 	"image"
 	"image/color"
+	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/wav"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
@@ -14,10 +18,11 @@ var (
 )
 
 type Runtime struct {
-	width  int
-	height int
-	keys   []ebiten.Key
-	image  *image.RGBA
+	width   int
+	height  int
+	keys    []ebiten.Key
+	image   *image.RGBA
+	aPlayer *audio.Player
 }
 
 func NewRuntime(width, height int) *Runtime {
@@ -30,34 +35,70 @@ func NewRuntime(width, height int) *Runtime {
 	r.height = height
 	r.image = image.NewRGBA(image.Rect(0, 0, 64, 32))
 
+	data, err := os.ReadFile("song.wav")
+	if err != nil {
+		panic("cant find wav file")
+	}
+
+	decodedSong, err := wav.DecodeWithoutResampling(bytes.NewReader(data))
+
+	if err != nil {
+		panic(err)
+	}
+
+	audioContext := audio.NewContext(44_000)
+	audioPlayer, err := audioContext.NewPlayer(decodedSong)
+	if err != nil {
+		panic(err)
+	}
+
+	r.aPlayer = audioPlayer
+
 	r.ClearScreen()
 
 	return r
 }
 
-func (g *Runtime) IsPixelSet(col int, row int) bool {
+func (r *Runtime) PlayAudio() {
+	if !r.aPlayer.IsPlaying() {
+		r.aPlayer.Play()
+	}
+}
 
-	isSet := g.image.RGBAAt(col, row) == colorWhite
+func (r *Runtime) StopAudio() {
+	if r.aPlayer.IsPlaying() {
+		r.aPlayer.Pause()
+		r.aPlayer.Rewind()
+	}
+}
+
+func (r *Runtime) StopAudio() {
+
+}
+
+func (r *Runtime) IsPixelSet(col int, row int) bool {
+
+	isSet := r.image.RGBAAt(col, row) == colorWhite
 
 	// if pixel is already "on", we turn off the pixel.
 	return isSet
 }
 
-func (g *Runtime) Set(col int, row int, on bool) {
+func (r *Runtime) Set(col int, row int, on bool) {
 	if on {
-		g.image.Set(col, row, colorWhite)
+		r.image.Set(col, row, colorWhite)
 	} else {
-		g.image.Set(col, row, colorBlack)
+		r.image.Set(col, row, colorBlack)
 
 		// draw a "shadow" pixel where the previously lit pixel was
 		//g.ghostImage.Set(col, row, colorWhite)
 	}
 }
 
-func (g *Runtime) ClearScreen() {
+func (r *Runtime) ClearScreen() {
 	for x := 0; x < 64; x++ {
 		for y := 0; y < 32; y++ {
-			g.image.Set(x, y, color.Black)
+			r.image.Set(x, y, color.Black)
 		}
 	}
 }

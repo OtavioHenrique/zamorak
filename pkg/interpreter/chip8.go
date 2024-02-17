@@ -22,6 +22,8 @@ var (
 	// so you can follow that convention if you want.
 	FONT_OFFSET = 0x50
 
+	TIMER_TICK = 000 / 60
+
 	// set of fonts
 	FONT_SET = []uint8{
 		0xF0, 0x90, 0x90, 0x90, 0xF0, //0
@@ -79,10 +81,8 @@ func NewChip8() *Chip8 {
 }
 
 func (c *Chip8) startDelayTimer() {
-	var tick = 1000 / 60
-
 	for {
-		time.Sleep(time.Millisecond * time.Duration(tick))
+		time.Sleep(time.Millisecond * time.Duration(TIMER_TICK))
 
 		if c.delayTimer > 0 {
 			c.delayTimer--
@@ -90,8 +90,24 @@ func (c *Chip8) startDelayTimer() {
 	}
 }
 
+func (c *Chip8) startSoundTimer(r *engine.Runtime) {
+	for {
+		time.Sleep(time.Millisecond * time.Duration(TIMER_TICK))
+
+		if c.soundTimer > 0 {
+			c.soundTimer--
+
+			r.PlayAudio()
+		} else {
+			r.StopAudio()
+		}
+
+	}
+}
+
 func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 	go c.startDelayTimer()
+	go c.startSoundTimer(r)
 	// Verifies if program size is greater than chip memory
 	if len(programData) > CHIP_MEMORY {
 		fmt.Print("Given program is larger than memory")
