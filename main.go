@@ -1,11 +1,15 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
-*/
 package main
 
-import "github.com/otaviohenrique/zamorak/cmd"
+import (
+	_ "embed"
+
+	"github.com/otaviohenrique/zamorak/cmd"
+)
+
+//go:embed resources/sound/song.wav
+var soundEffect []byte
 
 func main() {
+	cmd.GameSound = soundEffect
 	cmd.Execute()
 }
