@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"image"
 	"image/color"
+	"log/slog"
 	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -23,9 +24,10 @@ type Runtime struct {
 	keys    []ebiten.Key
 	image   *image.RGBA
 	aPlayer *audio.Player
+	logger  *slog.Logger
 }
 
-func NewRuntime(width, height int) *Runtime {
+func NewRuntime(width, height int, gameSound []byte, logger *slog.Logger) *Runtime {
 	initializedImage := ebiten.NewImage(64, 32)
 	initializedImage.Fill(color.RGBA{}) // initialize all pixels to black, 0 alpha.
 
@@ -35,21 +37,20 @@ func NewRuntime(width, height int) *Runtime {
 	r.height = height
 	r.image = image.NewRGBA(image.Rect(0, 0, 64, 32))
 
-	data, err := os.ReadFile("song.wav")
-	if err != nil {
-		panic("cant find wav file")
-	}
-
-	decodedSong, err := wav.DecodeWithoutResampling(bytes.NewReader(data))
+	decodedSong, err := wav.DecodeWithoutResampling(bytes.NewReader(gameSound))
 
 	if err != nil {
-		panic(err)
+		logger.Error("ERROR DECODING SOUND FILE", "err", err, "bytes", gameSound)
+
+		os.Exit(1)
 	}
 
 	audioContext := audio.NewContext(44_000)
 	audioPlayer, err := audioContext.NewPlayer(decodedSong)
 	if err != nil {
-		panic(err)
+		logger.Error("ERROR CREATING AUDIO PLAYER")
+
+		os.Exit(1)
 	}
 
 	r.aPlayer = audioPlayer
@@ -72,15 +73,10 @@ func (r *Runtime) StopAudio() {
 	}
 }
 
-func (r *Runtime) StopAudio() {
-
-}
-
 func (r *Runtime) IsPixelSet(col int, row int) bool {
 
 	isSet := r.image.RGBAAt(col, row) == colorWhite
 
-	// if pixel is already "on", we turn off the pixel.
 	return isSet
 }
 
@@ -89,9 +85,6 @@ func (r *Runtime) Set(col int, row int, on bool) {
 		r.image.Set(col, row, colorWhite)
 	} else {
 		r.image.Set(col, row, colorBlack)
-
-		// draw a "shadow" pixel where the previously lit pixel was
-		//g.ghostImage.Set(col, row, colorWhite)
 	}
 }
 
@@ -111,7 +104,6 @@ func (r *Runtime) Update() error {
 
 func (r *Runtime) Draw(screen *ebiten.Image) {
 	screen.WritePixels(r.image.Pix)
-	//screen.DrawImage(r.ghostImage, &ebiten.DrawImageOptions{})
 }
 
 func (r *Runtime) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {

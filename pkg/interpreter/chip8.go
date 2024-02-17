@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"time"
 
@@ -63,9 +64,10 @@ type Chip8 struct {
 	memory        [4096]byte //4kb internal memory
 	delayTimer    byte
 	soundTimer    byte
+	logger        *slog.Logger
 }
 
-func NewChip8() *Chip8 {
+func NewChip8(log *slog.Logger) *Chip8 {
 	c := new(Chip8)
 
 	c.stack = [32]uint16{}
@@ -76,6 +78,7 @@ func NewChip8() *Chip8 {
 	c.memory = [4096]byte{}
 	c.delayTimer = 0x0
 	c.soundTimer = 0x0
+	c.logger = log
 
 	return c
 }
@@ -108,9 +111,10 @@ func (c *Chip8) startSoundTimer(r *engine.Runtime) {
 func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 	go c.startDelayTimer()
 	go c.startSoundTimer(r)
+
 	// Verifies if program size is greater than chip memory
-	if len(programData) > CHIP_MEMORY {
-		fmt.Print("Given program is larger than memory")
+	if len := len(programData); len > CHIP_MEMORY {
+		c.logger.Error("Given program is larger than memory", "program_data", len, "chip_memory", CHIP_MEMORY)
 	}
 
 	for i := range FONT_SET {
@@ -138,13 +142,15 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 		NN := b1                         // NN = second byte
 		NNN := uint16(X)<<8 | uint16(NN) // NNN = second, third and fourth nibbles
 
-		fmt.Printf("First instruction: %02x", instr)
-
-		fmt.Printf("X: %02x\n", X)
-		fmt.Printf("Y: %02x\n", Y)
-		fmt.Printf("N: %02x\n", N)
-		fmt.Printf("NN: %02x\n", NN)
-		fmt.Printf("NNN: %02x\n", NNN)
+		c.logger.Debug(
+			"Instruction decoded",
+			"instruction", fmt.Sprintf("%02x", instr),
+			"X", fmt.Sprintf("%02x", X),
+			"Y", fmt.Sprintf("%02x", Y),
+			"N", fmt.Sprintf("%02x", N),
+			"NN", fmt.Sprintf("%02x", NN),
+			"NNN", fmt.Sprintf("%02x", NNN),
+		)
 
 		switch instr {
 		case 0x00:
@@ -154,66 +160,83 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 				case 0x0: // clear screen
 					r.ClearScreen()
 
-					fmt.Print("clear scren\n")
+					c.logger.Debug("Clear Screen Instruction", "INSTR", fmt.Sprintf("%02x", instr))
 				case 0xE:
 					c.pc = c.stack[c.stackFrame]
 					c.stackFrame--
-					fmt.Print("set stack pointer to the top\n")
+
+					c.logger.Debug("Set stack pointer to the top Instruction")
 				default:
-					fmt.Printf("Unknown instruction. INSTR: %02x Y: %02x\n", instr, Y)
+					c.logger.Warn("Unknown instruction", "INSTR", fmt.Sprintf("%02x", instr), "Y", fmt.Sprintf("%02x", Y))
 				}
 			}
 		case 0x1:
 			c.pc = NNN
-			fmt.Printf("JUMP to NNN: %02x\n", NNN)
-			fmt.Printf("SET PROGRAM COUNTER to NNN: %02x\n", NNN)
+
+			c.logger.Debug("Jump to NNN Instruction. Set Program counter", "NNN", fmt.Sprintf("%02x", NNN), "INSTR", fmt.Sprintf("%02x", instr))
 		case 0x2:
 			c.stackFrame++
 			c.stack[c.stackFrame] = c.pc
 			c.pc = NNN
-			fmt.Printf("CALL subroutine at NNN: %02x\n", NNN)
-			fmt.Printf("Increment stack pointer\n")
-			fmt.Printf("Put PC at top of the stack. PC: %d\n", c.pc)
-			fmt.Printf("SET PC to NNN. PC: %d, NNN: %02x\n", c.pc, NNN)
-		case 0x3:
-			if c.registers[X] == NN {
-				c.pc += 2
-			}
 
-			fmt.Printf("Skip next instruction if Vx = kk.\n")
-		case 0x4:
-			if c.registers[X] != NN {
+			c.logger.Debug("Increment stack pointer", "INSTR", fmt.Sprintf("%02x", instr))
+			c.logger.Debug("CALL subroutine at NNN", "NNN", fmt.Sprintf("%02x", NNN), "INSTR", fmt.Sprintf("%02x", instr))
+			c.logger.Debug("Put PC at top of the stack", "PC", fmt.Sprintf("%02x", NNN), "INSTR", fmt.Sprintf("%02x", instr))
+			c.logger.Debug("Set PC to NNN", "PC", fmt.Sprintf("%02x", c.pc), "NNN", fmt.Sprintf("%02x", NNN), "INSTR", fmt.Sprintf("%02x", instr))
+		case 0x3:
+			VX := c.registers[X]
+			c.logger.Debug("Skip next instruction if Vx = kk (NN)", "VX", fmt.Sprintf("%02x", VX), "NN", fmt.Sprintf("%02x", NN), "INSTR", fmt.Sprintf("%02x", instr))
+
+			if VX == NN {
 				c.pc += 2
+				c.logger.Debug("Skiping next instruction, VX == KK", "VX", fmt.Sprintf("%02x", VX), "NN", fmt.Sprintf("%02x", NN), "INSTR", fmt.Sprintf("%02x", instr))
 			}
-			fmt.Printf("Skip next instruction if Vx != kk.\n")
+		case 0x4:
+			VX := c.registers[X]
+			c.logger.Debug("Skip next instruction if Vx != kk (NN)", "VX", fmt.Sprintf("%02x", VX), "NN", fmt.Sprintf("%02x", NN), "INSTR", fmt.Sprintf("%02x", instr))
+
+			if VX != NN {
+				c.pc += 2
+				c.logger.Debug("Skiping next instruction, VX != KK", "VX", fmt.Sprintf("%02x", VX), "NN", fmt.Sprintf("%02x", NN), "INSTR", fmt.Sprintf("%02x", instr))
+			}
 		case 0x5:
-			fmt.Printf("Skip next instruction if Vx = Vy.\n")
-			if N == 0x0 && c.registers[X] == c.registers[Y] {
+			VX := c.registers[X]
+			VY := c.registers[Y]
+
+			c.logger.Debug("Skip next instruction if Vx = Vy", "VX", fmt.Sprintf("%02x", VX), "VY", fmt.Sprintf("%02x", VY), "INSTR", fmt.Sprintf("%02x", instr))
+
+			if N == 0x0 && VX == VY {
+				c.logger.Debug("Skiping next instruction Vx != Vy", "VX", fmt.Sprintf("%02x", VX), "VY", fmt.Sprintf("%02x", VY), "INSTR", fmt.Sprintf("%02x", instr))
 				c.pc += 2
 			}
 		case 0x6:
-			c.registers[X] = NN
+			VX := c.registers[X]
+			c.logger.Debug("SET Vx = KK", "VX", fmt.Sprintf("%02x", VX), "KK (NN)", fmt.Sprintf("%02x", NN), "INSTR", fmt.Sprintf("%02x", instr))
 
-			fmt.Printf("Set Vx = KK\n")
+			c.registers[X] = NN
 		case 0x7:
+			c.logger.Debug("Set Vx = Vx + KK", "VX", fmt.Sprintf("%02x", c.registers[X]), "KK (NN)", fmt.Sprintf("%02x", NN), "INSTR", fmt.Sprintf("%02x", instr))
+
 			c.registers[X] = NN + c.registers[X]
-			fmt.Printf("Set Vx = Vx + KK\n")
 		case 0x8:
 			switch N {
 			case 0x0:
+				c.logger.Debug("Set Vx = Vy", "VX", fmt.Sprintf("%02x", c.registers[X]), "VY", fmt.Sprintf("%02x", c.registers[Y]), "INSTR", fmt.Sprintf("%02x", instr))
+
 				c.registers[X] = c.registers[Y]
-				fmt.Printf("Set Vx = Vy\n")
 			case 0x1:
+				c.logger.Debug("Set Vx = Vx OR Vy", "VX", fmt.Sprintf("%02x", c.registers[X]), "VY", fmt.Sprintf("%02x", c.registers[Y]), "INSTR", fmt.Sprintf("%02x", instr))
 				c.registers[X] = c.registers[X] | c.registers[Y]
-				fmt.Printf("Set Vx = Vx OR Vy\n")
 			case 0x2:
+				c.logger.Debug("Set Vx = Vx AND Vy", "VX", fmt.Sprintf("%02x", c.registers[X]), "VY", fmt.Sprintf("%02x", c.registers[Y]), "INSTR", fmt.Sprintf("%02x", instr))
+
 				c.registers[X] = c.registers[X] & c.registers[Y]
-				fmt.Printf("Set Vx = Vx AND Vy\n")
 			case 0x3:
+				c.logger.Debug("Set Vx = Vx XOR Vy", "VX", fmt.Sprintf("%02x", c.registers[X]), "VY", fmt.Sprintf("%02x", c.registers[Y]), "INSTR", fmt.Sprintf("%02x", instr))
+
 				c.registers[X] = c.registers[X] ^ c.registers[Y]
-				fmt.Printf("Set Vx = Vx XOR Vy\n")
 			case 0x4:
-				fmt.Printf("Set Vx = Vx + Vy, set VF = carry\n")
+				c.logger.Debug("Set Vx = Vx + Vy, set VF = carry", "VX", fmt.Sprintf("%02x", c.registers[X]), "VY", fmt.Sprintf("%02x", c.registers[Y]), "VF", fmt.Sprintf("%02x", c.registers[0xF]), "INSTR", fmt.Sprintf("%02x", instr))
 
 				sum := uint16(c.registers[X]) + uint16(c.registers[Y])
 
@@ -225,15 +248,17 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 
 				c.registers[X] = byte(sum)
 			case 0x5:
-				fmt.Printf("Set Vx = Vx - Vy, set VF = carry\n")
+				c.logger.Debug("Set Vx = Vx - Vy, set VF = carry", "VX", fmt.Sprintf("%02x", c.registers[X]), "VY", fmt.Sprintf("%02x", c.registers[Y]), "VF", fmt.Sprintf("%02x", c.registers[0xF]), "INSTR", fmt.Sprintf("%02x", instr))
 
 				if c.registers[X] > c.registers[Y] {
 					c.registers[0xF] = 0x1
 				} else {
 					c.registers[0xF] = 0x0
 				}
+
 				c.registers[X] = c.registers[X] - c.registers[Y]
 			case 0x6:
+				c.logger.Debug("Set Vx = Vx SHR 1", "VX", fmt.Sprintf("%02x", c.registers[X]), "INSTR", fmt.Sprintf("%02x", instr))
 				lastBit := c.registers[X] & 0x01
 
 				if lastBit > 0 {
@@ -256,8 +281,6 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 				//Using >> for division by powers of 2 is efficient and works well when you're dealing with integers and you want to express division in terms of binary operations.
 				//
 				c.registers[X] = c.registers[X] >> 1
-
-				fmt.Printf("Set Vx = Vx SHR 1.\n")
 			case 0x7:
 				if c.registers[Y] > c.registers[X] {
 					c.registers[0xF] = 0x1
@@ -409,13 +432,14 @@ func (c *Chip8) Interpret(r *engine.Runtime, programData []byte) {
 				c.indexRegister = c.indexRegister + uint16(X+1)
 			case 0x65:
 				fmt.Printf("Read registers V0 through Vx from memory starting at location I.")
+
 				for i := uint8(0); i <= X; i++ {
 					c.registers[i] = c.memory[c.indexRegister]
 					c.indexRegister = c.indexRegister + 1
 				}
 			}
 		default:
-			fmt.Printf("Unknown Instruction.\n")
+			c.logger.Warn("Unknown instruction", "INSTR", fmt.Sprintf("%02x", instr), "Y", fmt.Sprintf("%02x", Y))
 		}
 
 		time.Sleep(time.Microsecond * 1300) // corresponds to about 700 instructions per second...
